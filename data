@@ -1,0 +1,86 @@
+function buscarYGuardarArchivo() {
+  var threads = GmailApp.search('from:email.com subject:"XX"', 0, 10);
+  
+  // Ordena los threads por fecha, toma el más reciente.
+  threads.sort(function(a, b) {
+    return b.getLastMessageDate() - a.getLastMessageDate();
+  });
+  
+  var mostRecentThread = threads[0];
+  var messages = mostRecentThread.getMessages();
+  
+  // Obtiene una referencia a la carpeta donde quieres guardar el archivo.
+  var folders = DriveApp.getFoldersByName('Nombre');
+  
+  // Comprueba si la carpeta existe.
+  if (!folders.hasNext()) {
+    Logger.log('No se encontró la carpeta.');
+    return;
+  }
+  
+  var folder = folders.next();
+  
+  // Nombre del archivo de Google Sheets donde se acumularán los datos.
+  var targetSheetName = 'nombre';
+
+  // Asegurarse de que el archivo de destino existe
+  var targetFiles = DriveApp.getFilesByName(targetSheetName);
+  if (!targetFiles.hasNext()) {
+    Logger.log('No se encontró el archivo objetivo: ' + targetSheetName);
+    return;
+  }
+
+  var targetFile = targetFiles.next();
+  var targetSpreadSheet = SpreadsheetApp.open(targetFile);
+  var targetSheet = targetSpreadSheet.getSheets()[0];
+
+  for (var i = 0; i < messages.length; i++) {
+    var message = messages[i];
+
+    // Verifica si el mensaje está en la bandeja de entrada y tiene archivos adjuntos.
+    if (message.isInInbox() && message.getAttachments().length > 0) {
+      var attachments = message.getAttachments();
+      
+      for (var k = 0; k < attachments.length; k++) {
+        var attachment = attachments[k];
+        
+        // Verifica que sea un archivo Excel.
+        if (attachment.getContentType() === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+          // Guarda el archivo en la carpeta específica.
+          var file = folder.createFile(attachment);
+          // Convierte el archivo Excel a Google Sheets.
+          var spreadsheet = convertExcelToGoogleSheets(file);
+          // Obtiene los datos de la hoja de cálculo convertida.
+          var sheet = spreadsheet.getSheets()[0];
+          var data = sheet.getDataRange().getValues();
+
+          // Elimina la primera fila de los datos.
+          data.shift();
+          data.shift();
+
+          targetSheet.getRange(targetSheet.getLastRow() + 1, 1, data.length, data[0].length).setValues(data);
+
+          // Elimina el archivo Excel y el Google Sheets convertido.
+          DriveApp.getFileById(file.getId()).setTrashed(true);
+          DriveApp.getFileById(spreadsheet.getId()).setTrashed(true);
+        }
+      }
+    }
+  }
+}
+
+function convertExcelToGoogleSheets(file) {
+  var fileId = file.getId();
+  var folderId = Drive.Files.get(fileId).parents[0].id;
+  var blob = file.getBlob();
+  var resource = {
+    title: file.getName(),
+    key: fileId,
+    parents: [{id: folderId}],
+  };
+
+  // Advanced Drive service must be enabled.
+  var newFile = Drive.Files.insert(resource, blob, {convert: true});
+
+  return SpreadsheetApp.openById(newFile.id);
+}
