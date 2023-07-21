@@ -1,7 +1,7 @@
 function buscarYGuardarArchivo() {
   var threads = GmailApp.search('from:email.com subject:"XX"', 0, 10);
   
-  // Ordena los threads por fecha, toma el más reciente.
+  // Ordena los threads por fecha y recoge el mail más reciente.
   threads.sort(function(a, b) {
     return b.getLastMessageDate() - a.getLastMessageDate();
   });
@@ -9,7 +9,7 @@ function buscarYGuardarArchivo() {
   var mostRecentThread = threads[0];
   var messages = mostRecentThread.getMessages();
   
-  // Obtiene una referencia a la carpeta donde quieres guardar el archivo.
+  // Obtiene el nombre de la carpeta donde quieres guardar el archivo.
   var folders = DriveApp.getFoldersByName('Nombre');
   
   // Comprueba si la carpeta existe.
@@ -20,10 +20,9 @@ function buscarYGuardarArchivo() {
   
   var folder = folders.next();
   
-  // Nombre del archivo de Google Sheets donde se acumularán los datos.
+  // Nombre del archivo de Google Sheets donde se hacemos el raw data
   var targetSheetName = 'nombre';
 
-  // Asegurarse de que el archivo de destino existe
   var targetFiles = DriveApp.getFilesByName(targetSheetName);
   if (!targetFiles.hasNext()) {
     Logger.log('No se encontró el archivo objetivo: ' + targetSheetName);
@@ -54,7 +53,7 @@ function buscarYGuardarArchivo() {
           var sheet = spreadsheet.getSheets()[0];
           var data = sheet.getDataRange().getValues();
 
-          // Elimina la primera fila de los datos.
+          // Elimina las dos primeras filas del reporte (esto es opcional, queda a vuestro criterio en función del report)
           data.shift();
           data.shift();
 
@@ -79,7 +78,6 @@ function convertExcelToGoogleSheets(file) {
     parents: [{id: folderId}],
   };
 
-  // Advanced Drive service must be enabled.
   var newFile = Drive.Files.insert(resource, blob, {convert: true});
 
   return SpreadsheetApp.openById(newFile.id);
